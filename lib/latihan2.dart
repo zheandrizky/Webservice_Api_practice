@@ -1,64 +1,103 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+// menampung data hasil pemanggilan API
+class Activity {
+  String aktivitas;
+  String jenis;
+
+  Activity({required this.aktivitas, required this.jenis}); //constructor
+
+  //map dari json ke atribut
+  factory Activity.fromJson(Map<String, dynamic> json) {
+    return Activity(
+      aktivitas: json['activity'],
+      jenis: json['type'],
+    );
+  }
+}
+
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
+
   @override
-  Widget build(BuildContext context) {
+  State<StatefulWidget> createState() {
+    return MyAppState();
+  }
+}
+
+class MyAppState extends State<MyApp> {
+  late Future<Activity> futureActivity; //menampung hasil
+
+  //late Future<Activity>? futureActivity;
+  String url = "https://www.boredapi.com/api/activity";
+
+  Future<Activity> init() async {
+    return Activity(aktivitas: "", jenis: "");
+  }
+
+  //fetch data
+  Future<Activity> fetchData() async {
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      // jika server mengembalikan 200 OK (berhasil),
+      // parse json
+      return Activity.fromJson(jsonDecode(response.body));
+    } else {
+      // jika gagal (bukan  200 OK),
+      // lempar exception
+      throw Exception('Gagal load');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    futureActivity = init();
+  }
+
+  @override
+  Widget build(Object context) {
     return MaterialApp(
-      title: 'Bored App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: BoredPage(),
-    );
-  }
-}
-
-class BoredPage extends StatefulWidget {
-  @override
-  _BoredPageState createState() => _BoredPageState();
-}
-
-class _BoredPageState extends State<BoredPage> {
-  String activity = 'Tap the button to get a recommendation';
-
-  Future<void> _getActivity() async {
-    final response =
-        await http.get(Uri.parse('https://www.boredapi.com/api/activity'));
-    final Map<String, dynamic> responseData = json.decode(response.body);
-    setState(() {
-      activity = responseData['activity'];
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Bored App'),
-      ),
+        home: Scaffold(
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              activity,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20.0),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Padding(
+            padding: EdgeInsets.only(bottom: 20),
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  futureActivity = fetchData();
+                });
+              },
+              child: Text("Saya bosan ..."),
             ),
-            SizedBox(height: 20.0),
-            ElevatedButton(
-              onPressed: _getActivity,
-              child: Text('Get Activity'),
-            ),
-          ],
-        ),
+          ),
+          FutureBuilder<Activity>(
+            future: futureActivity,
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return Center(
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                      Text(snapshot.data!.aktivitas),
+                      Text("Jenis: ${snapshot.data!.jenis}")
+                    ]));
+              } else if (snapshot.hasError) {
+                return Text('${snapshot.error}');
+              }
+              // default: loading spinner.
+              return const CircularProgressIndicator();
+            },
+          ),
+        ]),
       ),
-    );
+    ));
   }
 }
